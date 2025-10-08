@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Drug interaction finder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" href="/icons/icon-192.png">
+  <meta name="theme-color" content="#0ea5e9" />
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,system-ui;margin:0;background:#0b1220;color:#e5e7eb}
+    .wrap{max-width:720px;margin:0 auto;padding:20px}
+    header{display:flex;justify-content:space-between;align-items:center}
+    a{color:#93c5fd;text-decoration:none}
+    .card{background:#111827;border:1px solid #1f2937;border-radius:16px;padding:16px;margin-top:16px}
+    input,button{width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#0b1220;color:#e5e7eb}
+    button{background:#0ea5e9;border-color:#0ea5e9;font-weight:600}
+    .row{display:grid;grid-template-columns:1fr;gap:12px}
+    .sources a{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    footer{opacity:.75;margin-top:20px;font-size:.85rem}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h2>Drug interaction finder</h2>
+      <nav><a href="/about.html">About</a></nav>
+    </header>
+
+    <div class="card">
+      <p>Enter two drugs (brand or generic). We’ll check FDA label “<b>Drug Interactions</b>” sections via DailyMed and summarize findings.</p>
+      <div class="row">
+        <input id="drugA" placeholder="Drug A (e.g., amiodarone)" autocomplete="off">
+        <input id="drugB" placeholder="Drug B (e.g., simvastatin)" autocomplete="off">
+        <button id="checkBtn">Check Interaction</button>
+      </div>
+    </div>
+
+    <div id="out" class="card" style="display:none"></div>
+
+    <footer>
+      <p style="margin:8px 0">Education only — summarizes FDA labeling; not medical advice. Always verify in original sources.</p>
+      <p style="margin:8px 0"><small>iPhone tip: Safari → Share → <b>Add to Home Screen</b> to install as an app.</small></p>
+    </footer>
+  </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+
+    const out = document.getElementById('out');
+    document.getElementById('checkBtn').onclick = async () => {
+      const drugA = document.getElementById('drugA').value.trim();
+      const drugB = document.getElementById('drugB').value.trim();
+      if(!drugA || !drugB) { alert('Please enter both drugs'); return; }
+
+      out.style.display = 'block';
+      out.innerHTML = 'Checking…';
+
+      try {
+        const resp = await fetch('/api/ddi', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ drugA, drugB })
+        });
+        const data = await resp.json();
+
+        if (data.error) throw new Error(data.error);
+
+        out.innerHTML = `
+          <h3>Assessment</h3>
+          ${data.severity ? `<p><b>Severity:</b> ${data.severity}</p>`:''}
+          ${data.mechanism ? `<p><b>Likely mechanism:</b> ${data.mechanism}</p>`:''}
+          <p>${data.summary}</p>
+          <div class="sources">
+            <h4>Sources</h4>
+            ${(data.sources||[]).map(u=>`<a href="${u}" target="_blank" rel="noopener">${u}</a>`).join('')}
+          </div>`;
+      } catch(e) {
+        out.innerHTML = `<p style="color:#f87171">Error: ${e.message}</p>`;
+      }
+    };
+  </script>
+</body>
+</html>
